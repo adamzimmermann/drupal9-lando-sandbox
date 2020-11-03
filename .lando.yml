@@ -1,0 +1,50 @@
+---
+name: drupal-lando-sandbox
+recipe: drupal9
+config:
+  php: "7.4"
+  webroot: web
+  xdebug: false
+
+events:
+  # Clear caches before a database import, since Redis caches persist even when
+  # all database tables are dropped.
+  pre-db-import:
+    - appserver: cd $LANDO_WEBROOT && drush cache-rebuild --yes
+  # Clear cache and run config:import after a database import.
+  post-db-import:
+    - appserver: cd $LANDO_WEBROOT && drush cache-rebuild --yes && drush config:import --yes
+
+services:
+  # To connect to a database via a GUI such as Sequel Pro:
+  # Host:     127.0.0.1
+  # Username: drupal8
+  # Password: drupal8
+  # Database: drupal8
+  # Port:     33161
+  database:
+    type: mariadb
+    portforward: 33161
+
+  appserver:
+    build_as_root:
+      - apt update -y && apt install jpegoptim pngquant
+
+  cache:
+    type: redis:5
+    persist: false
+    portforward: false
+
+tooling:
+  redis-cli:
+    service: cache
+  xdebug-on:
+    service: appserver
+    description: Enable xdebug for apache.
+    cmd: docker-php-ext-enable xdebug && /etc/init.d/apache2 reload
+    user: root
+  xdebug-off:
+    service: appserver
+    description: Disable xdebug for apache.
+    cmd: rm /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini && /etc/init.d/apache2 reload
+    user: root
